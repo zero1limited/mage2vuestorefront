@@ -19,6 +19,7 @@ const _normalizeExtendedData = function (result, generateUrlKey = true, config =
   result.slug = result.url_key
   if (config.seo.useUrlDispatcher) {
     result.url_path = config.seo.categoryUrlPathMapper(result)
+    result.slug = result.url_path
   } else {
     result.url_path = result.url_key;
   }
