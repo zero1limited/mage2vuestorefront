@@ -551,6 +551,7 @@ class ProductAdapter extends AbstractMagentoAdapter {
                 item.category = values; // here we get configurable options
                 if (this.config.seo.useUrlDispatcher) {
                   item.url_path = this.config.seo.productUrlPathMapper(item)
+                  item.slug = item.url_path
                 }
                 resolve(item)
             });
