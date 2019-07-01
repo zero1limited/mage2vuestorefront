@@ -1,0 +1,20 @@
+version: '3.0'
+services:
+  endpoint:
+    container_name: endpoint
+    build:
+      context: .
+      dockerfile: docker/updates-endpoint/Dockerfile
+    env_file: docker/updates-endpoint/.env
+    ports:
+      - '6060:8080'
+    volumes:
+      - ./:/var/www
+  worker:
+    container_name: worker
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    env_file: docker/worker/.env
+    volumes:
+      - ./:/var/www

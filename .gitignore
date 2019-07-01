@@ -3,3 +3,5 @@ src/test_reindex.sh
 src/node_modules
 package-lock.json
 node_modules
+docker/updates-endpoint/.env
+docker/worker/.env

@@ -23,4 +23,15 @@ router.post('/products/update', function(req, res) { // TODO: add api key middle
   }
 });
 
+router.get('/products/update/sku/:sku', function(req, res){
+
+  let sku = req.params['sku'];
+  console.log('Queuing update for sku: %s', sku);
+
+  let queue = kue.createQueue(Object.assign(config.kue, { redis: config.redis }));
+
+  queue.createJob('product', { skus: [sku], adapter: 'magento' }).save();
+  res.json({ status: 'done', message: 'Product ' + sku + ' scheduled to be refreshed'});
+});
+
 module.exports = router;
