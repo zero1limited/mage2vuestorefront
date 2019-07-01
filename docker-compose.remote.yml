@@ -1,7 +1,7 @@
 version: '3.0'
 services:
   endpoint:
-    container_name: endpoint
+    container_name: vue_datapump_endpoint
     build:
       context: .
       dockerfile: docker/updates-endpoint/Dockerfile
@@ -11,7 +11,7 @@ services:
     volumes:
       - ./:/var/www
   worker:
-    container_name: worker
+    container_name: vue_datapump_worker
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
