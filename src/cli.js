@@ -26,14 +26,14 @@ const reindexAttributes = (adapterName, removeNonExistent) => {
   return new Promise((resolve, reject) => {
     let adapter = factory.getAdapter(adapterName, 'attribute');
     let tsk = new Date().getTime();
-  
+
     adapter.run({
       transaction_key: tsk,
       done_callback: () => {
         if (removeNonExistent) {
           adapter.cleanUp(tsk);
         }
-  
+
         logger.info('Task done! Exiting in 30s...');
         setTimeout(process.exit, TIME_TO_EXIT); // let ES commit all changes made
         resolve();
@@ -48,16 +48,16 @@ const reindexReviews = (adapterName, removeNonExistent) => {
   return new Promise((resolve, reject) => {
     let adapter = factory.getAdapter(adapterName, 'review');
     let tsk = new Date().getTime();
-  
+
     adapter.cleanUp(tsk);
-  
+
     adapter.run({
       transaction_key: tsk,
       done_callback: () => {
         if (removeNonExistent) {
           adapter.cleanUp(tsk);
         }
-  
+
         logger.info('Task done! Exiting in 30s...');
         setTimeout(process.exit, TIME_TO_EXIT); // let ES commit all changes made
         resolve();
@@ -147,14 +147,14 @@ const reindexTaxRules = (adapterName, removeNonExistent) => {
   return new Promise((resolve, reject) => {
     let adapter = factory.getAdapter(adapterName, 'taxrule');
     let tsk = new Date().getTime();
-  
+
     adapter.run({
       transaction_key: tsk,
       done_callback: () => {
         if (removeNonExistent) {
           adapter.cleanUp(tsk);
         }
-  
+
         logger.info('Task done! Exiting in 30s...');
         setTimeout(process.exit, TIME_TO_EXIT); // let ES commit all changes made
         resolve();
@@ -224,7 +224,7 @@ function reindexProducts(adapterName, removeNonExistent, partitions, partitionSi
         logger.info('Not propagating queue - only worker mode!');
       }
 
-      // TODO: separte the execution part to run in multi-tenant env
+      // TODO: separate the execution part to run in multi-tenant env
       queue.process('products', partition_count, (job, done) => {
         let adapter = factory.getAdapter(adapterName, 'product');
         if (job && job.data.page && job.data.page_size) {
@@ -311,11 +311,15 @@ function fullReindex(adapterName, removeNonExistent, partitions, partitionSize, 
  */
 function runProductsworker(adapterName, partitions) {
 
+  console.log('starting runProductsworker');
+
   logger.info('Starting `productsworker` worker. Waiting for jobs ...');
   let partition_count = partitions;
 
   // TODO: separte the execution part to run in multi-tenant env
   queue.process('product', partition_count, (job, done) => {
+
+    console.log('processing product job');
 
     if (job && job.data.skus && Array.isArray(job.data.skus)) {
 
@@ -327,7 +331,79 @@ function runProductsworker(adapterName, partitions) {
         skus: job.data.skus,
         parent_sync: true,
         done_callback: () => {
+          console.log('task done!');
           logger.info('Task done!');
+          return done();
+        }
+      });
+    } else return done();
+
+  });
+}
+
+/**
+ * Run worker listening to "product" command on KUE queue
+ */
+function runAttributesworker(adapterName, partitions) {
+
+console.log('starting runAttributesworker');
+
+  logger.info('Starting `attributesworker` worker. Waiting for jobs ...');
+  let partition_count = partitions;
+
+  // TODO: separte the execution part to run in multi-tenant env
+  queue.process('attribute', partition_count, (job, done) => {
+
+    console.log('processing attribute job');
+
+    if (job && job.data.attributes && Array.isArray(job.data.attributes)) {
+
+      logger.info('Starting attribute pull job for ' + job.data.attributes.join(','));
+
+      let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'attribute');
+
+      adapter.run({
+        attributes: job.data.attributes,
+        parent_sync: true,
+        done_callback: () => {
+          console.log('runAttributesworker task done!');
+          logger.info('runAttributesworker Task done!');
+          return done();
+        }
+      });
+    } else return done();
+
+  });
+}
+
+
+/**
+ * Run worker listening to "product" command on KUE queue
+ */
+function runCategoriesworker(adapterName, partitions) {
+
+console.log('starting runCategoriesworker');
+
+  logger.info('Starting `categoriesworker` worker. Waiting for jobs ...');
+  let partition_count = partitions;
+
+  // TODO: separte the execution part to run in multi-tenant env
+  queue.process('category', partition_count, (job, done) => {
+
+    console.log('processing category job');
+
+    if (job && job.data.categories && Array.isArray(job.data.categories)) {
+
+      logger.info('Starting category pull job for ' + job.data.categories.join(','));
+
+      let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'category');
+
+      adapter.run({
+        categories: job.data.categories,
+        parent_sync: true,
+        done_callback: () => {
+          console.log('runCategoriesworker task done!');
+          logger.info('runCategoriesworker Task done!');
           return done();
         }
       });
@@ -434,6 +510,7 @@ program
     }
   })
 
+// SR: Added attributes + categories worker commands below.
 program
   .command('productsworker')
   .option('--adapter <adapter>', 'name of the adapter', 'magento')
@@ -441,7 +518,23 @@ program
   .action((cmd) => {
     runProductsworker(cmd.adapter, cmd.partitions);
   })
-      
+
+program
+  .command('attributesworker')
+  .option('--adapter <adapter>', 'name of the adapter', 'magento')
+  .option('--partitions <partitions>', 'number of partitions', 1)
+  .action((cmd) => {
+    runAttributesworker(cmd.adapter, cmd.partitions);
+  })
+
+program
+  .command('categoriesworker')
+  .option('--adapter <adapter>', 'name of the adapter', 'magento')
+  .option('--partitions <partitions>', 'number of partitions', 1)
+  .action((cmd) => {
+    runCategoriesworker(cmd.adapter, cmd.partitions);
+  })
+
 program
   .command('reviews')
   .option('--adapter <adapter>', 'name of the adapter', 'magento')
@@ -449,7 +542,7 @@ program
   .action(async (cmd) => {
     await reindexReviews(cmd.adapter, cmd.removeNonExistent);
   })
-  
+
 program
   .command('taxrule')
   .option('--adapter <adapter>', 'name of the adapter', 'magento')
@@ -457,7 +550,7 @@ program
   .action(async (cmd) => {
     await reindexTaxRules(cmd.adapter, cmd.removeNonExistent);
   })
-      
+
 /**
 * Sync cms blocks
 */
