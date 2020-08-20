@@ -23,15 +23,36 @@ router.post('/products/update', function(req, res) { // TODO: add api key middle
   }
 });
 
-router.get('/products/update/sku/:sku', function(req, res){
 
-  let sku = req.params['sku'];
-  console.log('Queuing update for sku: %s', sku);
+router.post('/categories/update', function(req, res) {
 
-  let queue = kue.createQueue(Object.assign(config.kue, { redis: config.redis }));
+  let categories = req.body.categories;
 
-  queue.createJob('product', { skus: [sku], adapter: 'magento' }).save();
-  res.json({ status: 'done', message: 'Product ' + sku + ' scheduled to be refreshed'});
+  console.log('Incoming category pull request for', categories)
+  if(categories.length > 0){
+    let queue = kue.createQueue(Object.assign(config.kue, { redis: config.redis }));
+
+    queue.createJob('categories', { categories: categories, adapter: 'magento' }).save();
+    res.json({ status: 'done', message: 'Categories ' + categories + ' scheduled to be refreshed'});
+  } else {
+    res.json({ status: 'error', message: 'Please provide product category ID(s) separated by comma'});
+  }
+});
+
+router.post('/attributes/update', function(req, res) {
+
+  let attributes = req.body.attributes;
+
+  console.log('Incoming attribute pull request for', attributes);
+
+  if(attributes.length > 0){
+    let queue = kue.createQueue(Object.assign(config.kue, { redis: config.redis }));
+
+    queue.createJob('attribute', { attributes: attributes, adapter: 'magento' }).save();
+    res.json({ status: 'done', message: 'Attributes ' + attributes + ' scheduled to be refreshed'});
+  } else {
+    res.json({ status: 'error', message: 'Please provide attibute ID(s) separated by comma'});
+  }
 });
 
 module.exports = router;
