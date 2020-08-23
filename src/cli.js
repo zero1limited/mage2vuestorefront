@@ -382,7 +382,7 @@ function runAllAttributesWorker(adapterName, partitions) {
 	
 	queue.process('attributes-all', partition_count, (job, done) => {
 		console.log('processing attribute job');
-		reindexProductCategories(cmd.adapter);
+		reindexAttributes(cmd.adapter);
 		return done();
 	});
 }
