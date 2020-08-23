@@ -342,7 +342,7 @@ function runProductsworker(adapterName, partitions) {
 }
 
 /**
- * Run worker listening to "product" command on KUE queue
+ * Run worker listening to "attribute" command on KUE queue
  */
 function runAttributesworker(adapterName, partitions) {
 
@@ -376,9 +376,19 @@ console.log('starting runAttributesworker');
   });
 }
 
+function runAllAttributesWorker(adapterName, partitions) {
+	logger.info('Starting `runAllAttributesworker` worker. Waiting for jobs ...');
+	let partition_count = partitions;
+	
+	queue.process('attributes-all', partition_count, (job, done) => {
+		console.log('processing attribute job');
+		reindexProductCategories(cmd.adapter);
+		return done();
+	});
+}
 
 /**
- * Run worker listening to "product" command on KUE queue
+ * Run worker listening to "categories" command on KUE queue
  */
 function runCategoriesworker(adapterName, partitions) {
 
@@ -410,6 +420,19 @@ console.log('starting runCategoriesworker');
     } else return done();
 
   });
+}
+
+function runAllCategoriesWorker(adapterName, partitions) {
+	logger.info('Starting `runAllCategoriesworker` worker. Waiting for jobs ...');
+	let partition_count = partitions;
+	
+	queue.process('categories-all', partition_count, (job, done) => {	
+		console.log('processing categories-all job');
+		
+		reindexProductCategories(cmd.adapter);
+		
+		return done();
+	});
 }
 
 program
@@ -526,6 +549,14 @@ program
   .action((cmd) => {
     runAttributesworker(cmd.adapter, cmd.partitions);
   })
+  
+  program
+  .command('allattributesworker')
+  .option('--adapter <adapter>', 'name of the adapter', 'magento')
+  .option('--partitions <partitions>', 'number of partitions', 1)
+  .action((cmd) => {
+    runAllAttributesWorker(cmd.adapter, cmd.partitions);
+  })
 
 program
   .command('categoriesworker')
@@ -533,6 +564,14 @@ program
   .option('--partitions <partitions>', 'number of partitions', 1)
   .action((cmd) => {
     runCategoriesworker(cmd.adapter, cmd.partitions);
+  })
+  
+  program
+  .command('allcategoriesworker')
+  .option('--adapter <adapter>', 'name of the adapter', 'magento')
+  .option('--partitions <partitions>', 'number of partitions', 1)
+  .action((cmd) => {
+  	runAllCategoriesWorker(cmd.adapter, cmd.partitions);
   })
 
 program
