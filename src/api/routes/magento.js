@@ -23,7 +23,6 @@ router.post('/products/update', function(req, res) { // TODO: add api key middle
   }
 });
 
-
 router.post('/categories/update', function(req, res) {
 
   let categories = req.body.categories;
@@ -37,6 +36,15 @@ router.post('/categories/update', function(req, res) {
   } else {
     res.json({ status: 'error', message: 'Please provide product category ID(s) separated by comma'});
   }
+});
+
+router.post('/categories/all', function(req, res) {
+	console.log('Incoming request to update all categories');
+	
+	let queue = kue.createQueue(Object.assign(config.kue, { redis: config.redis }));
+	
+	queue.createJob('categories-all', { adapter: 'magento' }).save();
+	res.json({ status: 'done', message: 'All categories scheduled to be refreshed'});
 });
 
 router.post('/attributes/update', function(req, res) {
@@ -53,6 +61,15 @@ router.post('/attributes/update', function(req, res) {
   } else {
     res.json({ status: 'error', message: 'Please provide attibute ID(s) separated by comma'});
   }
+});
+
+router.post('/attributes/all', function(req, res) {
+	console.log('Incoming request to update all attributes');
+	
+	let queue = kue.createQueue(Object.assign(config.kue, { redis: config.redis }));
+	
+	queue.createJob('attributes-all', { adapter: 'magento' }).save();
+	res.json({ status: 'done', message: 'All attributes scheduled to be refreshed'});
 });
 
 module.exports = router;
