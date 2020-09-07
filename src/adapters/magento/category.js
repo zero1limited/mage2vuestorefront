@@ -91,6 +91,11 @@ class CategoryAdapter extends AbstractMagentoAdapter {
       }
 
       if (!item.url_key || this.generateUniqueUrlKeys) {
+
+        if(!item.name){
+          item.name = 'category-with-no-name-' + item.id;
+        }
+
         item.url_key = _slugify(item.name) + '-' + item.id
       }
       item.slug = item.url_key;

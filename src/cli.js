@@ -15,6 +15,7 @@ const INDEX_META_PATH = process.env.INDEX_META_PATH ? path.join('tmp', process.e
 
 let kue = require('kue');
 let queue = kue.createQueue(Object.assign(config.kue, { redis: config.redis }));
+let _get = require('lodash/get');
 
 const _handleBoolParam = (value) => {
   return JSON.parse(value) // simple way to handle all the '0', '1', 'true', true, false ...
@@ -307,132 +308,117 @@ function fullReindex(adapterName, removeNonExistent, partitions, partitionSize, 
 }
 
 /**
- * Run worker listening to "product" command on KUE queue
- */
-function runProductsworker(adapterName, partitions) {
-
-  console.log('starting runProductsworker');
-
-  logger.info('Starting `productsworker` worker. Waiting for jobs ...');
-  let partition_count = partitions;
-
-  // TODO: separte the execution part to run in multi-tenant env
-  queue.process('product', partition_count, (job, done) => {
-
-    console.log('processing product job');
-
-    if (job && job.data.skus && Array.isArray(job.data.skus)) {
-
-      logger.info('Starting product pull job for ' + job.data.skus.join(','));
-
-      let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'product');
-
-      adapter.run({
-        skus: job.data.skus,
-        parent_sync: true,
-        done_callback: () => {
-          console.log('task done!');
-          logger.info('Task done!');
-          return done();
-        }
-      });
-    } else return done();
-
-  });
-}
-
-/**
- * Run worker listening to "attribute" command on KUE queue
+ * Run worker listening to "attributes" command on KUE queue
  */
 function runAttributesworker(adapterName, partitions) {
-
-console.log('starting runAttributesworker');
-
   logger.info('Starting `attributesworker` worker. Waiting for jobs ...');
   let partition_count = partitions;
 
-  // TODO: separte the execution part to run in multi-tenant env
-  queue.process('attribute', partition_count, (job, done) => {
-
-    console.log('processing attribute job');
-
-    if (job && job.data.attributes && Array.isArray(job.data.attributes)) {
-
-      logger.info('Starting attribute pull job for ' + job.data.attributes.join(','));
-
-      let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'attribute');
-
-      adapter.run({
-        attributes: job.data.attributes,
-        parent_sync: true,
-        done_callback: () => {
-          console.log('runAttributesworker task done!');
-          logger.info('runAttributesworker Task done!');
-          return done();
-        }
-      });
-    } else return done();
-
+  queue.process('attributes', partition_count, (job, done) => {
+    if(job){
+      let attributes = _get(job, 'data.attributes', null);
+      if(attributes){
+        logger.info('Starting attribute pull job for ' + job.data.attributes.join(','));
+        let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'attribute');
+        adapter.run({
+          attributes: attributes,
+          parent_sync: true,
+          done_callback: () => {
+            logger.info('runAttributesworker Task done!');
+            return done();
+          }
+        });
+      }else{
+        let removeNonExistent = _get(job, 'data.remove_non_existent', true);
+        logger.info('Stating full attribute reindex');
+        reindexAttributes(adapterName, removeNonExistent);
+        logger.info('runAttributesworker Task done!');
+        return done();
+      }
+    }else{
+      return done();
+    }
   });
-}
-
-function runAllAttributesWorker(adapterName, partitions) {
-	logger.info('Starting `runAllAttributesworker` worker. Waiting for jobs ...');
-	let partition_count = partitions;
-	
-	queue.process('attributes-all', partition_count, (job, done) => {
-		console.log('processing attribute job');
-		reindexAttributes(cmd.adapter);
-		return done();
-	});
 }
 
 /**
  * Run worker listening to "categories" command on KUE queue
  */
 function runCategoriesworker(adapterName, partitions) {
-
-console.log('starting runCategoriesworker');
-
   logger.info('Starting `categoriesworker` worker. Waiting for jobs ...');
   let partition_count = partitions;
 
-  // TODO: separte the execution part to run in multi-tenant env
-  queue.process('category', partition_count, (job, done) => {
-
-    console.log('processing category job');
-
-    if (job && job.data.categories && Array.isArray(job.data.categories)) {
-
-      logger.info('Starting category pull job for ' + job.data.categories.join(','));
-
-      let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'category');
-
-      adapter.run({
-        categories: job.data.categories,
-        parent_sync: true,
-        done_callback: () => {
-          console.log('runCategoriesworker task done!');
-          logger.info('runCategoriesworker Task done!');
-          return done();
-        }
-      });
-    } else return done();
-
+  queue.process('categories', partition_count, (job, done) => {
+    if(job){
+      let categories = _get(job, 'data.categories', null);
+      if(categories){
+        let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'category');
+        adapter.run({
+          categories: categories,
+          parent_sync: true,
+          done_callback: () => {
+            console.log('runCategoriesworker task done!');
+            logger.info('runCategoriesworker Task done!');
+            return done();
+          }
+        });
+      }else{
+        let removeNonExistant = _get(job, 'body.remove_non_existent', true);
+        let extendedCategoryImport = _get(job, 'body.extended_category_import', true);
+        let generateUniqueUrlKeys = _get(job, 'body.generate_unique_url_keys', true);
+        logger.info('Stating full category reindex');
+        reindexCategories(adapterName, removeNonExistant, extendedCategoryImport, generateUniqueUrlKeys);
+        logger.info('runCategoriesworker Task done!');
+        return done();
+      }
+    }else{
+      return done();
+    }
   });
 }
 
-function runAllCategoriesWorker(adapterName, partitions) {
-	logger.info('Starting `runAllCategoriesworker` worker. Waiting for jobs ...');
-	let partition_count = partitions;
-	
-	queue.process('categories-all', partition_count, (job, done) => {	
-		console.log('processing categories-all job');
-		
-		reindexProductCategories(cmd.adapter);
-		
-		return done();
-	});
+/**
+ * Run worker listening to "category-product" command on KUE queue
+ */
+function runCateogryProductsWorker(adapterName, partitions) {
+  logger.info('Starting `runCateogryProductsWorker` worker. Waiting for jobs ...');
+  let partition_count = partitions;
+
+  queue.process('category-product', partition_count, (job, done) => {
+    if(job){
+      logger.info('processing category-product job');
+      reindexProductCategories(adapterName);
+      return done();
+    }else{
+      return done();
+    }
+  });
+}
+
+/**
+ * Run worker listening to "product" command on KUE queue
+ */
+function runProductsworker(adapterName, partitions) {
+  logger.info('Starting `productsworker` worker. Waiting for jobs ...');
+  let partition_count = partitions;
+
+  queue.process('product', partition_count, (job, done) => {
+    if(job){
+      let skus = _get(job, 'data.skus', []);
+      logger.info('Starting product pull job for ' + job.data.skus.join(','));
+      let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'product');
+      adapter.run({
+        skus: skus,
+        parent_sync: true,
+        done_callback: () => {
+          logger.info('Task done!');
+          return done();
+        }
+      });
+    }else{
+      return done();
+    }
+  });
 }
 
 program
@@ -535,27 +521,11 @@ program
 
 // SR: Added attributes + categories worker commands below.
 program
-  .command('productsworker')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .action((cmd) => {
-    runProductsworker(cmd.adapter, cmd.partitions);
-  })
-
-program
   .command('attributesworker')
   .option('--adapter <adapter>', 'name of the adapter', 'magento')
   .option('--partitions <partitions>', 'number of partitions', 1)
   .action((cmd) => {
     runAttributesworker(cmd.adapter, cmd.partitions);
-  })
-  
-  program
-  .command('allattributesworker')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .action((cmd) => {
-    runAllAttributesWorker(cmd.adapter, cmd.partitions);
   })
 
 program
@@ -565,13 +535,21 @@ program
   .action((cmd) => {
     runCategoriesworker(cmd.adapter, cmd.partitions);
   })
-  
-  program
-  .command('allcategoriesworker')
+
+program
+  .command('categoryproductsworker')
   .option('--adapter <adapter>', 'name of the adapter', 'magento')
   .option('--partitions <partitions>', 'number of partitions', 1)
   .action((cmd) => {
-  	runAllCategoriesWorker(cmd.adapter, cmd.partitions);
+    runCateogryProductsWorker(cmd.adapter, cmd.partitions);
+  })
+
+program
+  .command('productsworker')
+  .option('--adapter <adapter>', 'name of the adapter', 'magento')
+  .option('--partitions <partitions>', 'number of partitions', 1)
+  .action((cmd) => {
+    runProductsworker(cmd.adapter, cmd.partitions);
   })
 
 program
