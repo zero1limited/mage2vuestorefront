@@ -30,7 +30,7 @@ if(_get(baseStoreConfig, 'elasticsearch.host', false)
 var magentoApiUrl = _get(baseConfig, 'magento2.api.url', false);
 var storeCode = _get(baseStoreConfig, 'storeCode', false);
 if(magentoApiUrl && baseStoreConfig && !magentoApiUrl.endsWith(storeCode)){
-  magento2ApiUrl += '/' + storeCode;
+  magentoApiUrl += '/' + storeCode;
 }
 
 module.exports = {
@@ -63,7 +63,7 @@ module.exports = {
   },
 
   magento: {
-    url: (magento2ApiUrl || process.env.MAGENTO_URL || 'http://magento2.demo-1.divante.pl/rest/'),
+    url: (magentoApiUrl || process.env.MAGENTO_URL || 'http://magento2.demo-1.divante.pl/rest/'),
     consumerKey: _get(baseConfig, 'magento2.api.consumerKey', (process.env.MAGENTO_CONSUMER_KEY || 'alva6h6hku9qxrpfe02c2jalopx7od1q')),
     consumerSecret: _get(baseConfig, 'magento2.api.consumerSecret', (process.env.MAGENTO_CONSUMER_SECRET || '9tgfpgoojlx9tfy21b8kw7ssfu2aynpm')),
     accessToken: _get(baseConfig, 'magento2.api.accessToken', (process.env.MAGENTO_ACCESS_TOKEN || 'rw5w0si9imbu45h3m9hkyrfr4gjina8q')),
