@@ -33,6 +33,7 @@ module.exports = {
   seo: {
     useUrlDispatcher: _get(baseConfig, 'mage2vue.seo_use_url_dispatcher', JSON.parse(process.env.SEO_USE_URL_DISPATCHER || true)),
     productUrlPathMapper: (product) => {
+      return product.url_key;
       const destPath = product.url_key + '/'
       console.log('Dest. product path = ', destPath)
       return destPath
@@ -49,6 +50,7 @@ module.exports = {
       // return destPath
     },
     categoryUrlPathMapper: (category) => {
+      return category.url_key;
       //const destSlug = (category.url_path ? category.url_path + '/': '') + category.url_key
       const destSlug = category.url_path + '/'
       console.log('Dest. cat path = ', destSlug)
