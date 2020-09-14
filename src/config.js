@@ -11,21 +11,26 @@ try{
 var baseStoreConfig = {};
 if(_get(baseConfig, 'availableStores', []).length > 0){
   baseStoreConfig = _get(
-    baseConfig,
-    'storeViews.' + _get(baseConfig, 'availableStores.0', 'default'),
-    {}
+  baseConfig,
+  'storeViews.' + _get(baseConfig, 'availableStores.0', 'default'),
+  {}
   )
 }
 var elasticSearchUrl = false;
 if(_get(baseStoreConfig, 'elasticsearch.host', false)
-  && _get(baseStoreConfig, 'elasticsearch.port', false)
-  && _get(baseStoreConfig, 'elasticsearch.protocol', false)
+&& _get(baseStoreConfig, 'elasticsearch.port', false)
+&& _get(baseStoreConfig, 'elasticsearch.protocol', false)
 ){
-  elasticSearchUrl = _get(baseStoreConfig, 'elasticsearch.protocol', false) 
-    + '://' 
-    + _get(baseStoreConfig, 'elasticsearch.host', false)
-    + ':' 
-    + _get(baseStoreConfig, 'elasticsearch.port', false)  
+  elasticSearchUrl = _get(baseStoreConfig, 'elasticsearch.protocol', false)
+  + '://'
+  + _get(baseStoreConfig, 'elasticsearch.host', false)
+  + ':'
+  + _get(baseStoreConfig, 'elasticsearch.port', false)
+}
+var magentoApiUrl = _get(baseConfig, 'magento2.api.url', false);
+var storeCode = _get(baseStoreConfig, 'storeCode', false);
+if(magentoApiUrl && baseStoreConfig && !magentoApiUrl.endsWith(storeCode)){
+  magento2ApiUrl += '/' + storeCode;
 }
 
 module.exports = {
@@ -33,7 +38,6 @@ module.exports = {
   seo: {
     useUrlDispatcher: _get(baseConfig, 'mage2vue.seo_use_url_dispatcher', JSON.parse(process.env.SEO_USE_URL_DISPATCHER || true)),
     productUrlPathMapper: (product) => {
-      return product.url_key;
       const destPath = product.url_key + '/'
       console.log('Dest. product path = ', destPath)
       return destPath
@@ -50,7 +54,7 @@ module.exports = {
       // return destPath
     },
     categoryUrlPathMapper: (category) => {
-      return category.url_key;
+      return category.url_path;
       //const destSlug = (category.url_path ? category.url_path + '/': '') + category.url_key
       const destSlug = category.url_path + '/'
       console.log('Dest. cat path = ', destSlug)
@@ -59,16 +63,16 @@ module.exports = {
   },
 
   magento: {
-    url: _get(baseConfig, 'magento2.api.url', (process.env.MAGENTO_URL || 'http://magento2.demo-1.divante.pl/rest/')),
+    url: (magento2ApiUrl || process.env.MAGENTO_URL || 'http://magento2.demo-1.divante.pl/rest/'),
     consumerKey: _get(baseConfig, 'magento2.api.consumerKey', (process.env.MAGENTO_CONSUMER_KEY || 'alva6h6hku9qxrpfe02c2jalopx7od1q')),
     consumerSecret: _get(baseConfig, 'magento2.api.consumerSecret', (process.env.MAGENTO_CONSUMER_SECRET || '9tgfpgoojlx9tfy21b8kw7ssfu2aynpm')),
     accessToken: _get(baseConfig, 'magento2.api.accessToken', (process.env.MAGENTO_ACCESS_TOKEN || 'rw5w0si9imbu45h3m9hkyrfr4gjina8q')),
     accessTokenSecret: _get(baseConfig, 'magento2.api.accessTokenSecret', (process.env.MAGENTO_ACCESS_TOKEN_SECRET || '00y9dl4vpxgcef3gn5mntbxtylowjcc9')),
     storeId: _get(baseStoreConfig, 'storeId', (process.env.MAGENTO_STORE_ID || 1)),
     currencyCode: _get(baseStoreConfig, 'i18n.currencyCode', (process.env.MAGENTO_CURRENCY_CODE || 'USD')),
-    msi: { 
-      enabled: _get(baseStoreConfig, 'msi.enabled', (process.env.MAGENTO_MSI_ENABLED || false)), 
-      stockId: _get(baseStoreConfig, 'msi.defaultStockId', (process.env.MAGENTO_MSI_STOCK_ID || 1)) 
+    msi: {
+      enabled: _get(baseStoreConfig, 'msi.enabled', (process.env.MAGENTO_MSI_ENABLED || false)),
+      stockId: _get(baseStoreConfig, 'msi.defaultStockId', (process.env.MAGENTO_MSI_STOCK_ID || 1))
     }
   },
 
