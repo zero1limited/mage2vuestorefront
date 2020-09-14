@@ -363,9 +363,9 @@ function runCategoriesworker(adapterName, partitions) {
           }
         });
       }else{
-        let removeNonExistant = _get(job, 'body.remove_non_existent', true);
-        let extendedCategoryImport = _get(job, 'body.extended_category_import', true);
-        let generateUniqueUrlKeys = _get(job, 'body.generate_unique_url_keys', true);
+        let removeNonExistant = _get(job, 'data.remove_non_existent', true);
+        let extendedCategoryImport = _get(job, 'data.extended_category_import', true);
+        let generateUniqueUrlKeys = _get(job, 'data.generate_unique_url_keys', true);
         logger.info('Stating full category reindex');
         reindexCategories(adapterName, removeNonExistant, extendedCategoryImport, generateUniqueUrlKeys);
         logger.info('runCategoriesworker Task done!');
