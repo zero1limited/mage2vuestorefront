@@ -421,183 +421,217 @@ function runProductsworker(adapterName, partitions) {
   });
 }
 
-program
-  .command('attributes')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .action(async (cmd) => {
-    await reindexAttributes(cmd.adapter, cmd.removeNonExistent);
-  });
+/**
+ * Run worker listening to "store-locator" command on KUE queue
+ */
+function runStoreLocatorworker(adapterName, partitions) {
+  logger.info('Starting `storeLocator` worker. Waiting for jobs ...');
+  let partition_count = partitions;
 
-program
-  .command('categories')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .option('--extendedCategories <extendedCategories>', 'extended categories import', true)
-  .option('--generateUniqueUrlKeys <generateUniqueUrlKeys>', 'make sure that category url keys are uniqe', true)
-  .action(async (cmd) => {
-    await reindexCategories(cmd.adapter, cmd.removeNonExistent, cmd.extendedCategories, cmd.generateUniqueUrlKeys);
-  });
-
-program
-  .command('cleanup')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--cleanupType <cleanupType>', 'type of the entity to clean up: product|category', 'product')
-  .option('--transactionKey <transactionKey>', 'transaction key', 0)
-  .action((cmd) => {
-    cleanup(cmd.adapter, cmd.cleanupType, cmd.transactionKey);
-  });
-
-program
-  .command('fullreindex')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .option('--partitionSize <partitionSize>', 'size of the partitions', 50)
-  .option('--initQueue <initQueue>', 'use the queue', true)
-  .option('--skus <skus>', 'comma delimited list of SKUs to fetch fresh informations from', '')
-  .option('--extendedCategories <extendedCategories>', 'extended categories import', true)
-  .option('--generateUniqueUrlKeys <generateUniqueUrlKeys>', 'generate unique url_keys', true)
-  .action((cmd) => {
-    fullReindex(cmd.adapter, true, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, cmd.extendedCategories, cmd.generateUniqueUrlKeys);
-  });
-
-program
-  .command('productcategories')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .action((cmd) => {
-    reindexProductCategories(cmd.adapter);
-  });
-
-program
-  .command('products')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .option('--partitionSize <partitionSize>', 'size of the partitions', 50)
-  .option('--initQueue <initQueue>', 'use the queue', true)
-  .option('--skus <skus>', 'comma delimited list of SKUs to fetch fresh informations from', '')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .option('--updatedAfter <updatedAfter>', 'timestamp to start the synchronization from', '')
-  .option('--page <page>', 'start from specific page', null)
-  .action((cmd) => {
-    if (cmd.updatedAfter) {
-      reindexProducts(cmd.adapter, cmd.removeNonExistent, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, new Date(cmd.updatedAfter), cmd.page);
-    } else {
-      reindexProducts(cmd.adapter, cmd.removeNonExistent, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, null, cmd.page);
+  queue.process('store-locator', partition_count, (job, done) => {
+    if(job){
+      let storeCodes = _get(job, 'data.storeCodes', []);
+      logger.info('Starting store locator pull job for ' + job.data.storeCodes.join(','));
+      let adapter = factory.getAdapter(job.data.adapter ? job.data.adapter : adapterName, 'storeLocator');
+      adapter.run({
+        storeCodes,
+        parent_sync: true,
+        done_callback: () => {
+          logger.info('Task done!');
+          return done();
+        }
+      });
+    }else{
+      return done();
     }
   });
+}
 
 program
-  .command('productsdelta')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .option('--partitionSize <partitionSize>', 'size of the partitions', 50)
-  .option('--initQueue <initQueue>', 'use the queue', true)
-  .option('--skus <skus>', 'comma delimited list of SKUs to fetch fresh informations from', '')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .action((cmd) => {
-    let indexMeta = { lastIndexDate: new Date() }
-    let updatedAfter = null
-    try {
-      // Make sure so the temporary folder exists.
-      if (!fs.existsSync('tmp')) {
-        fs.mkdirSync('tmp')
-      }
-      indexMeta = jsonFile.readFileSync(INDEX_META_PATH)
-      updatedAfter = new Date(indexMeta.lastIndexDate)
-    } catch (err) {
-      console.log('Seems like first time run!')
-      updatedAfter = null // full reindex
-    }
+.command('attributes')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.action(async (cmd) => {
+  await reindexAttributes(cmd.adapter, cmd.removeNonExistent);
+});
 
-    reindexProducts(cmd.adapter, cmd.removeNonExistent, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, updatedAfter);
+program
+.command('categories')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.option('--extendedCategories <extendedCategories>', 'extended categories import', true)
+.option('--generateUniqueUrlKeys <generateUniqueUrlKeys>', 'make sure that category url keys are uniqe', true)
+.action(async (cmd) => {
+  await reindexCategories(cmd.adapter, cmd.removeNonExistent, cmd.extendedCategories, cmd.generateUniqueUrlKeys);
+});
 
-    try {
-      indexMeta.lastIndexDate = new Date()
-      jsonFile.writeFile(INDEX_META_PATH, indexMeta)
-    } catch (err) {
-      console.log('Error writing index meta!', err)
+program
+.command('cleanup')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--cleanupType <cleanupType>', 'type of the entity to clean up: product|category', 'product')
+.option('--transactionKey <transactionKey>', 'transaction key', 0)
+.action((cmd) => {
+  cleanup(cmd.adapter, cmd.cleanupType, cmd.transactionKey);
+});
+
+program
+.command('fullreindex')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.option('--partitionSize <partitionSize>', 'size of the partitions', 50)
+.option('--initQueue <initQueue>', 'use the queue', true)
+.option('--skus <skus>', 'comma delimited list of SKUs to fetch fresh informations from', '')
+.option('--extendedCategories <extendedCategories>', 'extended categories import', true)
+.option('--generateUniqueUrlKeys <generateUniqueUrlKeys>', 'generate unique url_keys', true)
+.action((cmd) => {
+  fullReindex(cmd.adapter, true, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, cmd.extendedCategories, cmd.generateUniqueUrlKeys);
+});
+
+program
+.command('productcategories')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.action((cmd) => {
+  reindexProductCategories(cmd.adapter);
+});
+
+program
+.command('products')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.option('--partitionSize <partitionSize>', 'size of the partitions', 50)
+.option('--initQueue <initQueue>', 'use the queue', true)
+.option('--skus <skus>', 'comma delimited list of SKUs to fetch fresh informations from', '')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.option('--updatedAfter <updatedAfter>', 'timestamp to start the synchronization from', '')
+.option('--page <page>', 'start from specific page', null)
+.action((cmd) => {
+  if (cmd.updatedAfter) {
+    reindexProducts(cmd.adapter, cmd.removeNonExistent, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, new Date(cmd.updatedAfter), cmd.page);
+  } else {
+    reindexProducts(cmd.adapter, cmd.removeNonExistent, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, null, cmd.page);
+  }
+});
+
+program
+.command('productsdelta')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.option('--partitionSize <partitionSize>', 'size of the partitions', 50)
+.option('--initQueue <initQueue>', 'use the queue', true)
+.option('--skus <skus>', 'comma delimited list of SKUs to fetch fresh informations from', '')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.action((cmd) => {
+  let indexMeta = { lastIndexDate: new Date() }
+  let updatedAfter = null
+  try {
+    // Make sure so the temporary folder exists.
+    if (!fs.existsSync('tmp')) {
+      fs.mkdirSync('tmp')
     }
-  })
+    indexMeta = jsonFile.readFileSync(INDEX_META_PATH)
+    updatedAfter = new Date(indexMeta.lastIndexDate)
+  } catch (err) {
+    console.log('Seems like first time run!')
+    updatedAfter = null // full reindex
+  }
+
+  reindexProducts(cmd.adapter, cmd.removeNonExistent, cmd.partitions, cmd.partitionSize, cmd.initQueue, cmd.skus, updatedAfter);
+
+  try {
+    indexMeta.lastIndexDate = new Date()
+    jsonFile.writeFile(INDEX_META_PATH, indexMeta)
+  } catch (err) {
+    console.log('Error writing index meta!', err)
+  }
+})
 
 // SR: Added attributes + categories worker commands below.
 program
-  .command('attributesworker')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .action((cmd) => {
-    runAttributesworker(cmd.adapter, cmd.partitions);
-  })
+.command('attributesworker')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.action((cmd) => {
+  runAttributesworker(cmd.adapter, cmd.partitions);
+})
 
 program
-  .command('categoriesworker')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .action((cmd) => {
-    runCategoriesworker(cmd.adapter, cmd.partitions);
-  })
+.command('categoriesworker')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.action((cmd) => {
+  runCategoriesworker(cmd.adapter, cmd.partitions);
+})
 
 program
-  .command('categoryproductsworker')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .action((cmd) => {
-    runCateogryProductsWorker(cmd.adapter, cmd.partitions);
-  })
+.command('categoryproductsworker')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.action((cmd) => {
+  runCateogryProductsWorker(cmd.adapter, cmd.partitions);
+})
 
 program
-  .command('productsworker')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--partitions <partitions>', 'number of partitions', 1)
-  .action((cmd) => {
-    runProductsworker(cmd.adapter, cmd.partitions);
-  })
+.command('productsworker')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.action((cmd) => {
+  runProductsworker(cmd.adapter, cmd.partitions);
+})
 
 program
-  .command('reviews')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .action(async (cmd) => {
-    await reindexReviews(cmd.adapter, cmd.removeNonExistent);
-  })
+.command('storelocatorworker')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--partitions <partitions>', 'number of partitions', 1)
+.action((cmd) => {
+  runStoreLocatorworker(cmd.adapter, cmd.partitions);
+})
 
 program
-  .command('taxrule')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .action(async (cmd) => {
-    await reindexTaxRules(cmd.adapter, cmd.removeNonExistent);
-  })
+.command('reviews')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.action(async (cmd) => {
+  await reindexReviews(cmd.adapter, cmd.removeNonExistent);
+})
+
+program
+.command('taxrule')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.action(async (cmd) => {
+  await reindexTaxRules(cmd.adapter, cmd.removeNonExistent);
+})
 
 /**
-* Sync cms blocks
-*/
+ * Sync cms blocks
+ */
 program
-  .command('blocks')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .action(async (cmd) => {
-    await reindexBlocks(cmd.adapter, cmd.removeNonExistent);
-  })
+.command('blocks')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.action(async (cmd) => {
+  await reindexBlocks(cmd.adapter, cmd.removeNonExistent);
+})
 
 program
-  .command('pages')
-  .option('--adapter <adapter>', 'name of the adapter', 'magento')
-  .option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
-  .action(async (cmd) => {
-    await reindexPages(cmd.adapter, cmd.removeNonExistent);
-  })
+.command('pages')
+.option('--adapter <adapter>', 'name of the adapter', 'magento')
+.option('--removeNonExistent <removeNonExistent>', 'remove non existent products', false)
+.action(async (cmd) => {
+  await reindexPages(cmd.adapter, cmd.removeNonExistent);
+})
 
 program
-  .on('command:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', program.args.join(' '));
-    process.exit(1);
-  });
+.on('command:*', () => {
+  console.error('Invalid command: %s\nSee --help for a list of available commands.', program.args.join(' '));
+  process.exit(1);
+});
 
 program
-  .parse(process.argv);
+.parse(process.argv);
 
 process
-  .on('unhandledRejection', (reason, p) => {
-    logger.error('Unhandled Rejection at: Promise', p, 'reason:', reason);
-    // application specific logging, throwing an error, or other logic here
-  });
+.on('unhandledRejection', (reason, p) => {
+  logger.error('Unhandled Rejection at: Promise', p, 'reason:', reason);
+  // application specific logging, throwing an error, or other logic here
+});

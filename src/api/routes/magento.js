@@ -21,12 +21,12 @@ router.post('/attributes/update', function(req, res) {
     attributes: attributes,
     remove_non_existent: removeNonExistant
   });
-  queue.createJob('attributes', { 
+  queue.createJob('attributes', {
     attributes: attributes,
     remove_non_existent: removeNonExistant,
-    adapter: 'magento' 
+    adapter: 'magento'
   }).save();
-  
+
   if(Array.isArray(attributes)){
     return res.json({ status: 'done', message: 'Attributes ' + attributes.join(',') + ' scheduled to be refreshed'});
   }else{
@@ -49,7 +49,7 @@ router.post('/categories/update', function(req, res) {
     extended_category_import: extendedCategoryImport,
     generate_unique_url_keys: generateUniqueUrlKeys
   });
-  queue.createJob('categories', { 
+  queue.createJob('categories', {
     categories: categories,
     remove_non_existent: removeNonExistant,
     extended_category_import: extendedCategoryImport,
@@ -79,13 +79,25 @@ router.post('/products/update', function(req, res) {
     return res.status(400)
     .json({ status: 'error', message: 'You must provide at least one SKU to update'});
   }
-  
+
   if(!Array.isArray(skus)){
     skus = [skus]
   }
   console.log('/products/update', skus);
   queue.createJob('product', { skus: skus, adapter: 'magento' }).save();
   return res.json({ status: 'done', message: 'Products ' + skus.join(',') + ' scheduled to be refreshed'});
+});
+
+// Store Locator Stores
+router.post('/store-locator/update', function(req, res) {
+  let storeCodes = _get(req, 'body.store_codes', null);
+
+  if(storeCodes && !Array.isArray(skus)){
+    storeCodes = [storeCodes]
+  }
+  console.log('/store-locator/update', storeCodes);
+  queue.createJob('store-locator', { storeCodes, adapter: 'magento' }).save();
+  return res.json({ status: 'done', message: 'Stores ' + storeCodes.join(',') + ' scheduled to be refreshed'});
 });
 
 module.exports = router;
